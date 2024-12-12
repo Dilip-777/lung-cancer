@@ -23,15 +23,20 @@ const analyzeCTScan = async (
   confidence: number;
   stage: 'normal' | 'benign' | 'malignant';
 }> => {
-  await new Promise((resolve) => setTimeout(resolve, 2000)); // Simulate processing time
-  const randomConfidence = Math.random();
-  const stages: Array<'normal' | 'benign' | 'malignant'> = [
-    'normal',
-    'benign',
-    'malignant',
-  ];
-  const randomStage = stages[Math.floor(Math.random() * stages.length)];
-  return { confidence: randomConfidence, stage: randomStage };
+  const formData = new FormData();
+  formData.append('image', file);
+
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/detect`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to analyze CT scan');
+  }
+
+  const data = (await response.json()).detections;
+  return { confidence: data.confidence, stage: data.class_name.toLowerCase() as 'normal' | 'benign' | 'malignant' };
 };
 
 export default function UploadCard() {
@@ -61,6 +66,7 @@ export default function UploadCard() {
         setAnalysis(result);
       } catch (error) {
         console.error('Error analyzing CT scan:', error);
+        alert('Failed to fetch. Please ensure the backend API is running.');
       } finally {
         setIsAnalyzing(false);
       }
@@ -110,28 +116,9 @@ export default function UploadCard() {
                 <CardTitle>Analysis Results</CardTitle>
               </CardHeader>
               <CardContent className='space-y-2'>
-                <div className='flex justify-between items-center'>
-                  <span>Confidence:</span>
-                  <Progress
-                    value={analysis.confidence * 100}
-                    className='w-2/3'
-                  />
-                </div>
-                <div className='flex justify-between items-center'>
-                  <span>Cancer Stage:</span>
-                  <span
-                    className={`font-semibold ${
-                      analysis.stage === 'normal'
-                        ? 'text-green-500'
-                        : analysis.stage === 'benign'
-                        ? 'text-yellow-500'
-                        : 'text-red-500'
-                    }`}
-                  >
-                    {analysis.stage.charAt(0).toUpperCase() +
-                      analysis.stage.slice(1)}
-                  </span>
-                </div>
+                <p><strong>Stage:</strong> {analysis.stage.charAt(0).toUpperCase() + analysis.stage.slice(1)}</p>
+                <Progress value={analysis.confidence * 100} />
+                <p><strong>Confidence:</strong> {(analysis.confidence * 100).toFixed(2)}%</p>
               </CardContent>
             </Card>
           )}
